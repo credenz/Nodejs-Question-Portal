@@ -24,8 +24,8 @@ signup = async (req, res) => {
     else if (req.method === 'POST') {
         try {
             const users = await User.find()
-            const user = users.find(user => user.username === req.body.username)
-            if(user != null) return res.status(404).json({message: 'username Already Taken'});
+            const user = users.find(user => user.username === req.body.username.toLowerCase())
+            if(user != null) return res.json({message: 'username Already Taken'});
 
             var role = null;
             if (req.body.role === undefined) role = ROLE.BASIC; else role = ROLE.ADMIN;
@@ -63,9 +63,7 @@ login = async (req, res) => {
 
     else if (req.method === 'POST') {
         const user = users.find(user => user.username === req.body.username)
-        if(user == null) {
-            return res.json({ message: 'User Not Found'}).status(400)
-        }
+        if(user == null) return res.json({ message: 'User Not Found'}).status(400)
 
         try {
             if (await bcrypt.compare(req.body.password, user.password)){
@@ -92,9 +90,15 @@ leaderboard = async (req, res)  => {
     if(req.method === 'GET'){
         try {
             const users = await User.find()
-            users.sort((b, a) => {return a.currentQue - b.currentQue});
+            
+            var without_admin = new Array();
+            users.forEach(element => {
+                if (element.role === ROLE.BASIC)
+                    without_admin.push(element);
+            });
+            without_admin.sort((b, a) => {return a.currentQue - b.currentQue});
             // console.log(users);
-            res.status(200).json(users);
+            res.status(200).json(without_admin);
         } catch (err) {
             res.status(500).json({message: err});
         }
@@ -116,7 +120,8 @@ que_submit = async (req, res) => {
                 opt4: req.body.opt4,
                 username: req.user.username,
                 rightopt: req.body.rightopt,
-                is_varified: 'no'
+                is_varified: 'no',
+                lang: req.body.lang
             });
             user.numberQue += 1;
             user.currentQue += 1;
@@ -210,11 +215,12 @@ partQue = async (req, res) => {
                 res.status(200).json(all_ques[req.params.queid]);
             else res.status(400).json({message: "Not in range"})
         }
-        else if (req.method === 'POST'){
-            if (req.body.is_valid != null)
+        else if (req.method === 'PUT'){
+            if (req.body.is_varified != null) {
                 que = all_ques[req.params.queid];
-                que.is_varified = 'yes';
+                que.is_varified = req.body.is_varified;
                 await que.save();
+            }
         }
     } catch (err) {
         res.json({message: `Internal Errors: ${err}`}).status(500);
